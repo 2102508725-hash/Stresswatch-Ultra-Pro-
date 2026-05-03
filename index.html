@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StressWatch Ultra PRO | Zenith</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #05070a; --panel: rgba(255, 255, 255, 0.03); --border: rgba(255, 255, 255, 0.1);
+  --text: #ffffff; --muted: #8892b0; --accent: #00ffa3; --accent-glow: rgba(0, 255, 163, 0.3);
+  --panic: #ff4d4d;
+}
+[data-theme="light"] {
+  --bg: #f8fafc; --panel: rgba(0, 0, 0, 0.05); --border: rgba(0, 0, 0, 0.1);
+  --text: #0f172a; --muted: #64748b; --accent: #059669; --panic: #d32f2f;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; overflow-x: hidden; min-height: 100vh; }
+
+.nav { backdrop-filter: blur(20px); background: rgba(0,0,0,0.2); padding: 1.2rem 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1000; }
+.logo { font-weight: 800; font-size: 1.4rem; letter-spacing: -1px; }
+.logo span { color: var(--accent); }
+
+.tabs { display: flex; justify-content: center; gap: 10px; padding: 20px 0; }
+.tab-btn { background: var(--panel); border: 1px solid var(--border); padding: 12px 24px; border-radius: 30px; color: var(--muted); cursor: pointer; font-weight: 600; border: 1px solid transparent; }
+.tab-btn.active { background: var(--accent); color: #000; border-color: var(--accent); box-shadow: 0 10px 20px var(--accent-glow); }
+
+.container { max-width: 850px; margin: 0 auto; padding: 0 20px 100px; }
+.view { display: none; opacity: 0; transform: translateY(20px); }
+.view.active { display: block; opacity: 1; transform: translateY(0); }
+
+.card { background: var(--panel); backdrop-filter: blur(15px); border: 1px solid var(--border); border-radius: 32px; padding: 2.5rem; margin-bottom: 1.5rem; position: relative; overflow: hidden; }
+.label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 1rem; display: block; }
+.val { font-family: 'JetBrains Mono', monospace; font-size: 4rem; font-weight: 500; line-height: 1; }
+
+.waveform-bg { position: absolute; bottom: 0; left: 0; width: 100%; height: 100px; opacity: 0.2; pointer-events: none; }
+
+.cbt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.cbt-item { background: var(--panel); border: 1px solid var(--border); padding: 25px; border-radius: 24px; cursor: pointer; }
+.cbt-item:hover { border-color: var(--accent); background: rgba(0, 255, 163, 0.05); }
+.cbt-item.panic:hover { border-color: var(--panic); background: rgba(255, 77, 77, 0.05); }
+
+#zenOverlay {
+    position: fixed; inset: 0; background: rgba(5, 7, 10, 0.95); backdrop-filter: blur(25px);
+    z-index: 2000; display: none; align-items: center; justify-content: center; padding: 30px;
+}
+.zen-content { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 40px; padding: 50px; max-width: 600px; width: 100%; text-align: center; }
+
+.breath-circle { width: 180px; height: 180px; border: 2px solid var(--border); border-radius: 50%; margin: 20px auto; display: flex; align-items: center; justify-content: center; position: relative; }
+.breath-fill { position: absolute; width: 100%; height: 100%; background: var(--accent); border-radius: 50%; opacity: 0.15; transform: scale(0.5); transition: transform 4s ease-in-out; }
+
+.btn { border: none; padding: 18px; border-radius: 20px; font-weight: 800; cursor: pointer; width: 100%; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
+.btn-main { background: var(--accent); color: #000; }
+.btn-panic { background: var(--panic); color: #fff; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div id="zenOverlay">
+    <div class="zen-content">
+        <span class="zen-icon" id="zenIcon">✨</span>
+        <h2 class="zen-title" id="overlayTitle">Exercise</h2>
+        <p class="zen-text" id="overlayText">Instructions</p>
+        <button class="btn" style="background: var(--panel); color: #fff;" onclick="closeZen()">Return to Hub</button>
+    </div>
+</div>
+
+<nav class="nav">
+    <div class="logo">STRESS<span>WATCH</span></div>
+    <button onclick="toggleTheme()" style="background:none; border:none; color:var(--text); cursor:pointer; font-size:1.2rem;">🌓</button>
+</nav>
+
+<div class="tabs">
+    <button class="tab-btn active" onclick="handleTabSwitch('monitor', this)">MONITOR</button>
+    <button class="tab-btn" onclick="handleTabSwitch('cbt', this)">CBT HUB</button>
+    <button class="tab-btn" onclick="handleTabSwitch('breath', this)">BREATHING</button>
+</div>
+
+<div class="container">
+    <!-- MONITOR VIEW -->
+    <div id="view-monitor" class="view active">
+        <div class="card">
+            <span class="label">Neural Scan</span>
+            <canvas id="waveCanvas" class="waveform-bg"></canvas>
+            <div style="display:flex; justify-content: space-between; align-items: flex-end; position: relative;">
+                <div><span class="label">BPM Reading</span><div class="val" id="hrVal">--</div></div>
+                <div style="text-align: right;"><span class="label">Timer</span><div class="val" id="timer" style="font-size: 2.5rem; color: var(--accent);">30s</div></div>
+            </div>
+            <button class="btn btn-main" style="margin-top: 40px;" onclick="startScan()">Start Scan</button>
+        </div>
+        
+        <div class="card" id="affirmationCard">
+            <span class="label">Daily Affirmation</span>
+            <p id="affirmationText" style="font-size: 1.4rem; font-weight: 300; line-height: 1.5;">Your mind is a powerful tool. Today, we choose calm.</p>
+            <button onclick="newAffirmation()" style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:0.8rem; margin-top:15px; font-weight:700;">GENERATE NEW →</button>
+        </div>
+    </div>
+
+    <!-- CBT HUB VIEW -->
+    <div id="view-cbt" class="view">
+        <div class="card">
+            <span class="label">Mindfulness Engine</span>
+            <div class="cbt-grid">
+                <div class="cbt-item" onclick="openZen('5-4-3-2-1 Grounding', 'Name 5 things you see, 4 you touch, 3 you hear, 2 you smell, 1 you taste.', '👁️')">
+                    <h4 style="color:var(--accent)">Grounding</h4>
+                    <p style="font-size: 0.9rem; color:var(--muted)">Panic Relief</p>
+                </div>
+                <div class="cbt-item" onclick="toggleDeepMusic()">
+                    <h4 id="musicTitle" style="color:var(--accent)">Play Music</h4>
+                    <p id="musicSub" style="font-size: 0.9rem; color:var(--muted)">Ambient Sine</p>
+                </div>
+                <div class="cbt-item panic" style="grid-column: span 2; border-color: var(--panic);" onclick="openZen('Emergency Stop', 'Close your eyes. Inhale for 4. Hold for 4. Repeat until the heart rate drops.', '🚨')">
+                    <h4 style="color:var(--panic)">SOS Calm</h4>
+                    <p style="font-size: 0.9rem; color:var(--muted)">Immediate Intervention</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BREATHING VIEW -->
+    <div id="view-breath" class="view">
+        <div class="card">
+            <span class="label">Box Breathing</span>
+            <div class="breath-circle"><div class="breath-fill" id="breathFill"></div><div class="breath-timer" id="breathClock">0</div></div>
+            <div id="breathState" style="text-align:center; font-weight:800; color:var(--accent); margin: 20px 0;">READY</div>
+            <button class="btn btn-main" onclick="startBoxBreathing()">Begin Cycle</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let audioCtx, osc1, osc2, gainNode;
+let scanInterval;
+let waveIdx = 0;
+
+// --- UTILS & MASTER KILL SWITCH ---
+function stopEverything() {
+    if (audioCtx) { audioCtx.close(); audioCtx = null; }
+    if (scanInterval) { clearInterval(scanInterval); }
+    document.getElementById('musicTitle').innerText = "Play Music";
+    document.getElementById('musicSub').innerText = "Ambient Sine";
+    document.getElementById('timer').innerText = "30s";
+}
+
+function handleTabSwitch(viewId, btn) {
+    stopEverything();
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('view-' + viewId).classList.add('active');
+    btn.classList.add('active');
+}
+
+// --- WAVEFORM ANIMATION ---
+const canvas = document.getElementById('waveCanvas');
+const ctx = canvas.getContext('2d');
+function drawWave() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.beginPath();
+    ctx.strokeStyle = '#00ffa3';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < canvas.width; i++) {
+        const y = 50 + Math.sin((i + waveIdx) * 0.05) * 20 + Math.random() * 5;
+        ctx.lineTo(i, y);
+    }
+    ctx.stroke();
+    waveIdx += 5;
+    if (scanInterval) requestAnimationFrame(drawWave);
+}
+
+// --- FEATURES ---
+const affirmations = [
+    "I am in control of my breath.",
+    "This feeling is temporary.",
+    "I have survived 100% of my hard days.",
+    "My peace is worth the effort.",
+    "I am grounded, safe, and present."
+];
+
+function newAffirmation() {
+    const text = affirmations[Math.floor(Math.random() * affirmations.length)];
+    document.getElementById('affirmationText').innerText = text;
+}
+
+function startScan() {
+    stopEverything();
+    let t = 30;
+    scanInterval = setInterval(() => {
+        t--;
+        document.getElementById('timer').innerText = t + "s";
+        document.getElementById('hrVal').innerText = Math.floor(68 + Math.random() * 12);
+        if (t <= 0) {
+            stopEverything();
+            openZen('Scan Complete', 'Your neural state is trending toward stability.', '✅');
+        }
+    }, 1000);
+    drawWave();
+}
+
+function toggleDeepMusic() {
+    if (audioCtx) { stopEverything(); return; }
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    osc1 = audioCtx.createOscillator(); osc2 = audioCtx.createOscillator(); gainNode = audioCtx.createGain();
+    osc1.type = 'sine'; osc1.frequency.setValueAtTime(110, audioCtx.currentTime);
+    osc2.type = 'sine'; osc2.frequency.setValueAtTime(164.81, audioCtx.currentTime);
+    gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.06, audioCtx.currentTime + 2);
+    osc1.connect(gainNode); osc2.connect(gainNode); gainNode.connect(audioCtx.destination);
+    osc1.start(); osc2.start();
+    document.getElementById('musicTitle').innerText = "Mute Music";
+    document.getElementById('musicSub').innerText = "🔊 Playing Resonance...";
+}
+
+async function startBoxBreathing() {
+    stopEverything();
+    const sequence = [{ l: 'INHALE', s: 1.5 }, { l: 'HOLD', s: 1.5 }, { l: 'EXHALE', s: 0.5 }, { l: 'HOLD', s: 0.5 }];
+    for (let i = 0; i < 2; i++) {
+        for (let step of sequence) {
+            document.getElementById('breathState').innerText = step.l;
+            document.getElementById('breathFill').style.transform = `scale(${step.s})`;
+            for (let c = 4; c > 0; c--) {
+                document.getElementById('breathClock').innerText = c;
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
+    }
+    document.getElementById('breathState').innerText = "COMPLETE";
+}
+
+function openZen(title, text, icon) {
+    stopEverything();
+    document.getElementById('overlayTitle').innerText = title;
+    document.getElementById('overlayText').innerText = text;
+    document.getElementById('zenIcon').innerText = icon;
+    document.getElementById('zenOverlay').style.display = 'flex';
+}
+
+function closeZen() { document.getElementById('zenOverlay').style.display = 'none'; }
+
+function toggleTheme() {
+    const cur = document.documentElement.getAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+}
+
+// Init canvas size
+canvas.width = canvas.offsetWidth;
+canvas.height = canvas.offsetHeight;
+</script>
+</body>
+</html>
